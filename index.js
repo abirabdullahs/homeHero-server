@@ -88,9 +88,6 @@ async function run() {
         });
 
 
-        
-
-
         app.delete('/services/:id', async (req, res) => {
             const id = req.params.id
 
@@ -99,6 +96,38 @@ async function run() {
         })
 
 
+
+         const bookingsCollection = homeHeroDB.collection("bookings");
+
+
+        app.post('/bookings', async (req, res) => {
+
+            const newBookings = req.body;
+
+            const existing = await bookingsCollection.findOne(newBookings);
+            if (existing) return res.status(400).send({ message: "already exist" })
+
+            const result = await bookingsCollection.insertOne(newBookings);
+            res.send(result);
+        })
+
+
+        app.get('/bookings',async (req, res)=>{
+            const result = await bookingsCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.get('/bookings/:email', async(req, res)=>{
+                const email = req.params.email;
+
+                try {
+                    const query = {email: email};
+                    const result = await bookingsCollection.find(query).toArray();
+                    res.send(result)
+                } catch (error) {
+                    console.log(error);
+                }
+        })
 
 
 
