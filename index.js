@@ -121,7 +121,7 @@ async function run() {
                 const email = req.params.email;
 
                 try {
-                    const query = {email: email};
+                    const query = {userEmail: email};
                     const result = await bookingsCollection.find(query).toArray();
                     res.send(result)
                 } catch (error) {
@@ -132,7 +132,12 @@ async function run() {
 
 
 
+        app.delete('/bookings/:id', async (req, res) => {
+            const id = req.params.id
 
+            const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id) })
+            res.send(result)
+        })
 
 
 
