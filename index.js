@@ -49,19 +49,37 @@ async function run() {
 
 
         app.get('/services', async (req, res) => {
-            const services = await servicesCollection
-                .aggregate([
-                    {
-                        $addFields: {
-                            avgRating: { $ifNull: ["$avgRating", 0] }
-                        }
-                    },
-                    { $sort: { avgRating: -1 } }
-                ])
-                .toArray();
+            try {
+                // Optional price filter from query parameters
+                const minPrice = parseFloat(req.query.minPrice) || 0;
+                const maxPrice = parseFloat(req.query.maxPrice) || 9999999;
 
-            res.send(services);
+                const services = await servicesCollection
+                    .aggregate([
+                        // Add default avgRating = 0 if missing
+                        {
+                            $addFields: {
+                                avgRating: { $ifNull: ["$avgRating", 0] }
+                            }
+                        },
+                        // Filter by price range
+                        {
+                            $match: {
+                                price: { $gte: minPrice, $lte: maxPrice }
+                            }
+                        },
+                        // Sort by avgRating descending
+                        { $sort: { avgRating: -1 } }
+                    ])
+                    .toArray();
+
+                res.send(services);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Failed to fetch services" });
+            }
         });
+
 
 
         app.get('/services/:email', async (req, res) => {
