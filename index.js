@@ -49,9 +49,19 @@ async function run() {
 
 
         app.get('/services', async (req, res) => {
-            const services = await servicesCollection.find().toArray();
+            const services = await servicesCollection
+                .aggregate([
+                    {
+                        $addFields: {
+                            avgRating: { $ifNull: ["$avgRating", 0] }
+                        }
+                    },
+                    { $sort: { avgRating: -1 } }
+                ])
+                .toArray();
+
             res.send(services);
-        })
+        });
 
 
         app.get('/services/:email', async (req, res) => {
@@ -88,6 +98,52 @@ async function run() {
         });
 
 
+
+
+        app.post('/services/:id/review', async (req, res) => {
+            const id = req.params.id;
+            const { rating, comment, userEmail } = req.body; // client sends these
+
+            if (!rating || !comment || !userEmail) {
+                return res.status(400).send({ message: "Rating, comment and userEmail are required" });
+            }
+
+            try {
+                const service = await servicesCollection.findOne({ _id: new ObjectId(id) });
+                if (!service) return res.status(404).send({ message: "Service not found" });
+
+                const review = {
+                    userEmail,
+                    rating: parseInt(rating),
+                    comment,
+                    createdAt: new Date()
+                };
+
+                // push review into reviews array
+                await servicesCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $push: { reviews: review } }
+                );
+
+                // recalculate avgRating
+                const updatedService = await servicesCollection.findOne({ _id: new ObjectId(id) });
+                const totalRating = updatedService.reviews.reduce((acc, r) => acc + r.rating, 0);
+                const avgRating = totalRating / updatedService.reviews.length;
+
+                await servicesCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { avgRating: avgRating } }
+                );
+
+                res.send({ message: "Review added successfully", avgRating, reviews: updatedService.reviews });
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
         app.delete('/services/:id', async (req, res) => {
             const id = req.params.id
 
@@ -97,7 +153,10 @@ async function run() {
 
 
 
-         const bookingsCollection = homeHeroDB.collection("bookings");
+
+
+
+        const bookingsCollection = homeHeroDB.collection("bookings");
 
 
         app.post('/bookings', async (req, res) => {
@@ -112,21 +171,21 @@ async function run() {
         })
 
 
-        app.get('/bookings',async (req, res)=>{
+        app.get('/bookings', async (req, res) => {
             const result = await bookingsCollection.find().toArray();
             res.send(result)
         })
 
-        app.get('/bookings/:email', async(req, res)=>{
-                const email = req.params.email;
+        app.get('/bookings/:email', async (req, res) => {
+            const email = req.params.email;
 
-                try {
-                    const query = {userEmail: email};
-                    const result = await bookingsCollection.find(query).toArray();
-                    res.send(result)
-                } catch (error) {
-                    console.log(error);
-                }
+            try {
+                const query = { userEmail: email };
+                const result = await bookingsCollection.find(query).toArray();
+                res.send(result)
+            } catch (error) {
+                console.log(error);
+            }
         })
 
 
