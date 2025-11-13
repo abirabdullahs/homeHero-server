@@ -55,38 +55,40 @@ async function run() {
 
 
 
-        app.get('/services', async (req, res) => {
-            try {
-                // Optional price filter from query parameters
-                const minPrice = parseFloat(req.query.minPrice) || 0;
-                const maxPrice = parseFloat(req.query.maxPrice) || 9999999;
+       app.get('/services', async (req, res) => {
+  try {
+    const minPrice = parseFloat(req.query.minPrice) || 0;
+    const maxPrice = parseFloat(req.query.maxPrice) || 9999999;
 
-                const services = await servicesCollection
-                    .aggregate([
-                        // Add default avgRating = 0 if missing
-                        {
-                            $addFields: {
-                                avgRating: { $ifNull: ["$avgRating", 0] }
-                            }
-                        },
-                        // Filter by price range
-                        {
-                            $match: {
-                                price: { $gte: minPrice, $lte: maxPrice }
-                            }
-                        },
-                        // Sort by avgRating descending
-                        { $sort: { avgRating: -1 } }
-                    ])
-                    .toArray();
+    const services = await servicesCollection
+      .aggregate([
+        {
+          $addFields: {
+            price: {
+              $cond: {
+                if: { $isNumber: "$price" },
+                then: "$price",
+                else: { $toDouble: { $ifNull: ["$price", 0] } }
+              }
+            },
+            avgRating: { $ifNull: ["$avgRating", 0] }
+          }
+        },
+        {
+          $match: {
+            price: { $gte: minPrice, $lte: maxPrice }
+          }
+        },
+        { $sort: { avgRating: -1 } }
+      ])
+      .toArray();
 
-                res.send(services);
-            } catch (err) {
-                console.error(err);
-                res.status(500).send({ message: "Failed to fetch services" });
-            }
-        });
-
+    res.send(services);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Failed to fetch services" });
+  }
+});
 
 
 
@@ -246,7 +248,12 @@ async function run() {
 }
 run().catch(console.dir);
 
-
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-});
+// Export the Express app for serverless platforms (Vercel).
+// When running locally, start the server with app.listen.
+if (process.env.VERCEL) {
+    module.exports = app;
+} else {
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
